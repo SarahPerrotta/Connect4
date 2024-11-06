@@ -1,135 +1,196 @@
 import java.util.Scanner;
+import java.io.*;
 
-public class connectFour {
+class Disc {
+    private String symbol;
 
-    private static final int ROWS = 6;
-    private static final int COLS = 7;
-
-    private int[][] gameBoard = new int[COLS][ROWS];
-    private static final int EMPTY = 0;
-    private static final int PLAYER_1 = 1;
-    private static final int PLAYER_2 = 2;
-
-    public static void main(String[] args) {
-        connectFour game = new connectFour();
-        game.play();
+    public Disc(String symbol) {
+        this.symbol = symbol;
     }
 
-    private void play() {
-        int currentPlayer = PLAYER_1;
-        boolean gameContinues = true;
+    public String getSymbol() {
+        return symbol;
+    }
+}
 
-        while (gameContinues) {
-            printBoard();
+class Player {
+    private String name;
+    private String symbol;
 
-            int column = getPlayerMove(currentPlayer);
-            int row = getAvailableRow(column);
-
-            if (row == -1) {
-                System.out.println("Column is full. Please choose another.");
-            } else {
-                gameBoard[column][row] = currentPlayer;
-
-                if (checkWin(column, row)) {
-                    System.out.println("Player " + currentPlayer + " wins!");
-                    gameContinues = false;
-                } else if (isBoardFull()) {
-                    System.out.println("It's a tie!");
-                    gameContinues = false;
-                } else {
-                    currentPlayer = currentPlayer == PLAYER_1 ? PLAYER_2 : PLAYER_1;
-                }
-            }
-        }
+    public Player(String name, String symbol) {
+        this.name = name;
+        this.symbol = symbol;
     }
 
-    private int getPlayerMove(int player) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Player " + player + ", please enter a column (0-6): ");
+    public int takeTurn(Scanner scanner) {
+        System.out.print(name + " (" + symbol + "), enter column (0-6): ");
         return scanner.nextInt();
     }
 
-    private int getAvailableRow(int column) {
+    public String getSymbol() {
+        return symbol;
+    }
+}
+
+class Grid implements Serializable {
+    private static final int ROWS = 6;
+    private static final int COLS = 7;
+    private Disc[][] board;
+
+    public Grid() {
+        board = new Disc[COLS][ROWS];
+    }
+
+    public int dropDisc(Player player, int column) {
+        int row = getAvailableRow(column);
+        if (row == -1) {
+            System.out.println("Column is full. Please choose another.");
+            return -1;
+        }
+        board[column][row] = new Disc(player.getSymbol());
+        return row;
+    }
+
+    public int getAvailableRow(int column) {
         for (int i = ROWS - 1; i >= 0; i--) {
-            if (gameBoard[column][i] == EMPTY) {
+            if (board[column][i] == null) {
                 return i;
             }
         }
-        return -1; // Column is full
+        return -1;
     }
 
-    private boolean checkWin(int column, int row) {
-        // Check horizontal (code to check for wins in different directions)
+    public boolean checkWin(int column, int row) {
+        return checkDirection(column, row, 1, 0) || // Horizontal
+               checkDirection(column, row, 0, 1) || // Vertical
+               checkDirection(column, row, 1, 1) || // Diagonal down-right
+               checkDirection(column, row, 1, -1);  // Diagonal down-left
+    }
+
+    private boolean checkDirection(int column, int row, int deltaX, int deltaY) {
         int count = 1;
-        for (int i = column - 1; i >= 0 && gameBoard[i][row] == gameBoard[column][row]; i--) {
+        String playerSymbol = board[column][row].getSymbol();
+        int x, y;
+
+        for (x = column + deltaX, y = row + deltaY; x >= 0 && x < COLS && y >= 0 && y < ROWS && board[x][y] != null && board[x][y].getSymbol().equals(playerSymbol); x += deltaX, y += deltaY) {
             count++;
-        }
-        for (int i = column + 1; i < COLS && gameBoard[i][row] == gameBoard[column][row]; i++) {
-            count++;
-        }
-        if (count >= 4) {
-            return true;
         }
 
-        // Check vertical
-        count = 1;
-        for (int i = row - 1; i >= 0 && gameBoard[column][i] == gameBoard[column][row]; i--) {
+        for (x = column - deltaX, y = row - deltaY; x >= 0 && x < COLS && y >= 0 && y < ROWS && board[x][y] != null && board[x][y].getSymbol().equals(playerSymbol); x -= deltaX, y -= deltaY) {
             count++;
-        }
-        for (int i = row + 1; i < ROWS && gameBoard[column][i] == gameBoard[column][row]; i++) {
-            count++;
-        }
-        if (count >= 4) {
-            return true;
         }
 
-        // Check diagonal (up-left to down-right)
-        count = 1;
-        for (int i = column - 1, j = row - 1; i >= 0 && j >= 0 && gameBoard[i][j] == gameBoard[column][row]; i--, j--) {
-            count++;
-        }
-        for (int i = column + 1, j = row + 1; i < COLS && j < ROWS && gameBoard[i][j] == gameBoard[column][row]; i++, j++) {
-            count++;
-        }
-        if (count >= 4) {
-            return true;
-        }
-
-        // Check diagonal (up-right to down-left)
-        count = 1;
-        for (int i = column + 1, j = row - 1; i < COLS && j >= 0 && gameBoard[i][j] == gameBoard[column][row]; i++, j--) {
-            count++;
-        }
-        for (int i = column - 1, j = row + 1; i >= 0 && j < ROWS && gameBoard[i][j] == gameBoard[column][row]; i--, j++) {
-            count++;
-        }
         return count >= 4;
     }
 
-    private boolean isBoardFull() {
+    public boolean isFull() {
         for (int i = 0; i < COLS; i++) {
-            if (gameBoard[i][0] == EMPTY) {
+            if (board[i][0] == null) {
                 return false;
             }
         }
         return true;
     }
 
-    private void printBoard() {
-        System.out.println("-----------------");
-        for (int i = ROWS - 1; i >= 0; i--) {
+    public void saveGame() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("ConnectFourSave.dat"))) {
+            out.writeObject(this);
+            System.out.println("Game saved successfully.");
+        } catch (IOException e) {
+            System.out.println("Error saving game.");
+        }
+    }
+
+    public static Grid loadGame() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream("ConnectFourSave.dat"))) {
+            System.out.println("Game loaded successfully.");
+            return (Grid) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error loading game.");
+            return new Grid();
+        }
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("-----------------------------\n");
+        for (int i = 0; i < ROWS; i++) {  // Start from the bottom row
             for (int j = 0; j < COLS; j++) {
-                System.out.print("|");
-                if (gameBoard[j][i] == EMPTY) {
-                    System.out.print(" ");
-                } else if (gameBoard[j][i] == PLAYER_1) {
-                    System.out.print("X");
+                sb.append("| ");
+                if (board[j][i] == null) {
+                    sb.append(" ");
                 } else {
-                    System.out.print("O");
+                    sb.append(board[j][i].getSymbol());
+                }
+                sb.append(" ");
+            }
+            sb.append("|\n");
+        }
+        sb.append("-----------------------------\n");
+        return sb.toString();
+    }
+    
+}
+
+public class ConnectFour {
+    public static void main(String[] args) {
+        Grid grid;
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Load saved game? (y/n): ");
+        String loadChoice = scanner.nextLine();
+        if (loadChoice.equalsIgnoreCase("y")) {
+            grid = Grid.loadGame();
+        } else {
+            grid = new Grid();
+        }
+
+        // Initialise players
+        System.out.print("Enter name for Player 1: ");
+        String name1 = scanner.nextLine();
+        Player player1 = new Player(name1, "X");
+
+        System.out.print("Enter name for Player 2: ");
+        String name2 = scanner.nextLine();
+        Player player2 = new Player(name2, "O");
+
+        Player currentPlayer = player1;
+        boolean gameContinues = true;
+
+        while (gameContinues) {
+            System.out.println(grid);
+            System.out.print("Enter 's' to save, or any other key to play: ");
+            String choice = scanner.nextLine();
+
+            if (choice.equals("s")) {
+                grid.saveGame();
+            } else {
+                int column;
+                while (true) {
+                    column = currentPlayer.takeTurn(scanner);
+                    if (column >= 0 && column < 7) {
+                        break;
+                    } else {
+                        System.out.println("Invalid column. Please enter a number between 0 and 6.");
+                    }
+                }
+                
+                int row = grid.dropDisc(currentPlayer, column);
+                if (row != -1) {
+                    if (grid.checkWin(column, row)) {
+                        System.out.println(grid);
+                        System.out.println(currentPlayer.getSymbol() + " wins!");
+                        gameContinues = false;
+                    } else if (grid.isFull()) {
+                        System.out.println(grid);
+                        System.out.println("It's a tie!");
+                        gameContinues = false;
+                    } else {
+                        currentPlayer = (currentPlayer == player1) ? player2 : player1;
+                    }
                 }
             }
-            System.out.println("|");
         }
-        System.out.println("-----------------");
+        scanner.close();
     }
 }
